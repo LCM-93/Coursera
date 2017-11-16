@@ -4,128 +4,152 @@ from tools import Tools
 import re
 import os
 from bs4 import BeautifulSoup
-from seleniumUtil import SeleniumUtil
-from contextlib import closing
 import requests
+from urlutil import UrlUtil
+import json
+from pprint import pprint
 
 class WeekCourse:
 
-	def __init__(self, urls ,session):
-		self.urls = urls
+	def __init__(self,title,url,session):
+		self.title = title
+		self.url = url
 		self.session = session
 		self.tools = Tools()
-		self.cookies = {}
-		# 将requests 请求的 cookies 转换为字典
-		for c in self.session.cookies:
-			self.cookies[c.name] = c.value
-		self.week = '第1周'
+		self.urlutil = UrlUtil()
+		self.baseurl = 'https://www.coursera.org/api/'
+		self.includesParam = 'includes=modules%2Clessons%2CpassableItemGroups%2CpassableItemGroupChoices%2CpassableLessonElements%2Citems%2Ctracks%2CgradePolicy&fields=moduleIds%2ConDemandCourseMaterialModules.v1(name%2Cslug%2Cdescription%2CtimeCommitment%2ClessonIds%2Coptional%2ClearningObjectives)%2ConDemandCourseMaterialLessons.v1(name%2Cslug%2CtimeCommitment%2CelementIds%2Coptional%2CtrackId)%2ConDemandCourseMaterialPassableItemGroups.v1(requiredPassedCount%2CpassableItemGroupChoiceIds%2CtrackId)%2ConDemandCourseMaterialPassableItemGroupChoices.v1(name%2Cdescription%2CitemIds)%2ConDemandCourseMaterialPassableLessonElements.v1(gradingWeight)%2ConDemandCourseMaterialItems.v2(name%2Cslug%2CtimeCommitment%2CcontentSummary%2CisLocked%2ClockableByItem%2CitemLockedReasonCode%2CtrackId%2ClockedStatus)%2ConDemandCourseMaterialTracks.v1(passablesCount)&showLockedItems=true'
+		self.videoInclude = 'includes=video&fields=onDemandVideos.v1(sources%2Csubtitles%2CsubtitlesVtt%2CsubtitlesTxt)'
+		self.supplementsInclude = 'includes=asset&fields=openCourseAssets.v1(typeName)%2CopenCourseAssets.v1(definition)'
+		self.assetsInclude = 'fields=audioSourceUrls%2C+videoSourceUrls%2C+videoThumbnailUrls%2C+fileExtension%2C+tags'
 
-		# print('cookies:::'+str(self.cookies))
-		self.seleniumUtil = SeleniumUtil()
-		self.seleniumUtil.initDriver(self.cookies)
+		self.assetPattern = re.compile(r'<asset.*?id="(.*?)".*?name="(.*?)".*?extension="(.*?)".*?/>',re.S)
 
-		self.titlePattern = re.compile(r'<h4.*?>(.*?)</h4>',re.S)
-		self.urlPattern = re.compile(r'<a.*?href="(.*?)".*?>.*?<h5 class="item-name.*?>.*?<span>(.*?)</span>.*?</h5>',re.S)
+	# 获取所有课程信息 Json 数据
+	def getCourseInfo(self):
+		params = self.url.split('/')
+		slug = ''
+		if params[-1]:
+			slug = params[-1]
+		else:
+			slug = params[-2]
+		url = self.baseurl + 'onDemandCourseMaterials.v2?q=slug&slug=%s&' %slug +self.includesParam
+		response = self.urlutil.get(url,self.session)
+		response.encoding='UTF-8'
+		jsonObject = json.loads(response.text)
+		self.elementId = jsonObject['elements'][0]['id']
+		return jsonObject['linked']
 
-	# 区分出每个小章节 
-	def getCourseItems(self,soup):
-		chapters = soup.select('div[class="rc-NamedItemList"]')
-		for chapter in chapters:
-			print('------------------------------------------------------------------------------------------------------------')
-			title = re.findall(self.titlePattern,str(chapter))[0]
-			title = self.tools.removeSpecialChar(str(title))
-			print('章节：'+title)
-			items = re.findall(self.urlPattern,str(chapter))
-			
-			if not items:
-				continue
+	# 处理章节
+	def doForModules(self):
+		modules = self.courseInfo['onDemandCourseMaterialModules.v1']
+		self.moduleNameDict = {}
+		i = 1
+		for module in modules:
+			dirName = self.title+'/'+str(i)+'.'+str(module['name'])
+			self.moduleNameDict[module['id']] = dirName
+			description = module['description']
+			i += 1
+			self.tools.writeFile('简介.txt',description,dirName)
 
-			for item in items:
-				fileName = self.tools.removeSpecialChar(str(item[1]))
-				url = str(item[0])
-				# 查看是否已经爬过了
-				if self.tools.isSpided(url):
-					print('https://www.coursera.org'+url +'  已经爬过了')
-					continue
-				# 过滤一些测试页面 讨论页面
-				if '/exam/' in url or '/programming/' in url or '/discussionPrompt/' in url:
-					continue
-				# 下载视频
-				if '/lecture/' in url:  
-					self.downloadVideo(url, self.week+'/'+str(title), fileName+'.mp4')
-				# 下载保存文本
-				if '/supplement/' in url:
-					self.downloadTxt(url, self.week+'/'+str(title), fileName+'.txt')
-				# 添加一条记录
-				self.tools.addSpidedRecord(url)
-			print('------------------------------------------------------------------------------------------------------------\n')
+	# 处理课程
+	def doForLessons(self):
+		lessons = self.courseInfo['onDemandCourseMaterialLessons.v1']
+		self.lessonsNameDict= {}
+		for lesson in lessons:
+			dirName = str(lesson['name'])
+			moduleId = str(lesson['moduleId'])
+			self.lessonsNameDict[lesson['id']] = dirName
+			self.tools.createDir(self.moduleNameDict[moduleId]+'/'+dirName)
 
-	
-	# 下载视频
-	def downloadVideo(self,url,fileDir,fileName):
-		url = 'https://www.coursera.org'+url
-		content = self.seleniumUtil.getJsPage(url,wait_class_name='flex-1',wait_time=10,isVideo=True)
-		soup = BeautifulSoup(content,'lxml')
-		down = soup.find('video')
-		pattern = re.compile(r'<video.*?>.*?<source.*?src="(.*?)".*?/>',re.S)
-		if down:
-			# 视频地址爬下后 需要做一些处理 去除; &amp 
-			videoUrl = re.findall(pattern,str(down))[0]
-			videoUrl = re.sub(r';','&',str(videoUrl))
-			videoUrl = re.sub(r'&amp','',videoUrl)
-			# print('\n视频下载地址：'+ videoUrl)
-			self.tools.downLoadFile(videoUrl,self.session,fileDir,fileName)
-	
 
-	# 保存文本信息
-	def downloadTxt(self,url,fileDir,fileName):
-		url = 'https://www.coursera.org'+url
-		content = self.seleniumUtil.getJsPage(url,wait_class_name='flex-1',wait_time=10)
-		soup = BeautifulSoup(content,'lxml')
-		self.downloadPDF(soup,fileDir)
-		mainText = soup.select('div[class="content-container feedback-not-fixed-at-bottom"]')[0]
-		mainText = self.tools.replaceContent(str(mainText))
-		print('保存文件：'+fileName)
-		self.tools.writeFile('TXT-'+fileName,mainText,fileDir)
+	# 处理每一小节的课程
+	def doForItems(self):
+		items = self.courseInfo['onDemandCourseMaterialItems.v2']
 
-	# 保存PDF
-	def downloadPDF(self,soup,fileDir):
-		linkList = soup.select('div[class="cml-asset cml-asset-pdf"]')
-		if linkList:
-			for link in linkList:
-				linkinfo = self.tools.getHref(str(link))
-				if not linkinfo:
-					continue
+		for item in items:
+			lessonId = str(item['lessonId'])
+			moduleId = str(item['moduleId'])
+			itemId = str(item['id']) 
+			slug = str(item['slug'])
+			itemName = str(item['name'])
+			typeName = str(item['contentSummary']['typeName'])
 
-				url = re.sub(';','&',str(linkinfo[0][0]))
-				url = re.sub(r'&amp','',url)
+			# itemUrl = self.url+'/'+typeName+'/'+itemId+'/'+slug
+			# print(itemUrl) 
+			if 'supplement' == typeName:
+				self.doForSupplementPage(itemId,self.moduleNameDict[moduleId]+'/'+self.lessonsNameDict[lessonId],itemName)
+			# elif 'lecture' == typeName:
+			# 	self.doForVideoPage(itemId,self.moduleNameDict[moduleId]+'/'+self.lessonsNameDict[lessonId],itemName)
 
-				fileName = 'PDF-'+str(linkinfo[0][1]).strip()
-				if not fileName.endswith('.pdf'):
-					fileName = fileName+'.pdf'
 
-				self.tools.downLoadFile(url,self.session,fileDir,fileName)
+
+	# 解析视频页 视频源
+	def doForVideoPage(self,itemId,dirName,itemName):
+		url = self.baseurl+'onDemandLectureVideos.v1/%s~%s?'%(self.elementId,itemId) + self.videoInclude
+		response = self.urlutil.get(url,self.session)
+		response.encoding = 'UTF-8'
+		jsonObject = json.loads(response.text)
+		sources = jsonObject['linked']['onDemandVideos.v1'][0]['sources']['byResolution']
+
+		videoUrl = ''
+		if not sources:
+			print('视频源解析失败')
+			return;
+		if sources['720p']:
+			videoUrl = sources['720p']['mp4VideoUrl']
+		elif sources['540p']:
+			videoUrl = sources['540p']['mp4VideoUrl']
+		else:
+			videoUrl = sources['360p']['mp4VideoUrl']
+
+		print('发现视频：%s'%itemName)
+		itemName = self.tools.removeSpecialChar(itemName)
+		self.tools.downLoadFile(videoUrl,self.session,dirName,itemName+'.mp4')
+
+
+	# 解析文本的页面
+	def doForSupplementPage(self,itemId,dirName,itemName):
+		url = self.baseurl+'onDemandSupplements.v1/%s~%s?'%(self.elementId,itemId) +self.supplementsInclude
+		response = self.urlutil.get(url,self.session)
+		response.encoding = 'UTF-8'
+		jsonObject = json.loads(response.text)
+		content = str(jsonObject['linked']['openCourseAssets.v1'][0]['definition']['value'])
+
+		assetInfo = re.findall(self.assetPattern,content)
+		if assetInfo:
+			self.doForAsset(str(assetInfo[0][0]),dirName,str(assetInfo[0][1]),str(assetInfo[0][2]))
+
+		content = content.replace('</text>','</text><br><br>')
+		content = content.replace('<code>','<pre>')
+		content = content.replace('</code>','</pre><br><br>')
+		content = '<html><head></head><body>' + content + '</body></html>'
+
+		print('发现网页：%s'%itemName)
+		itemName = self.tools.removeSpecialChar(itemName)
+		self.tools.writeFile(itemName+'.html',content,dirName)
+
+
+	# 如果有需要下载到文件如pdf等  进行处理
+	def doForAsset(self,assetId,dirName,itemName,assetsType):
+		url = self.baseurl+'assets.v1?ids=%s&'%assetId + self.assetsInclude
+		response = self.urlutil.get(url,self.session)
+		response.encoding = 'UTF-8'
+		jsonObject = json.loads(response.text)
+		assetsUrl = jsonObject['elements'][0]['url']['url']
+		
+
+		print('发现文件：%s'%itemName)
+		itemName = self.tools.removeSpecialChar(itemName)
+		self.tools.downLoadFile(assetsUrl,self.session,dirName,itemName+'.'+assetsType)
+
 
 
 	def start(self):
-		i = 1
-		for url in self.urls:
-			self.week = '第%d周' %i
-			print('\n=============== '+self.week+' ===============\n')
-			content = self.seleniumUtil.getJsPage(url,'flex-1')
-			soup = BeautifulSoup(content,'lxml')
-			i += 1
-			self.getCourseItems(soup)
+		self.courseInfo = self.getCourseInfo()
+		
+		self.doForModules()
+		self.doForLessons()
+		self.doForItems() 
+		
 
-		self.seleniumUtil.quit()
-
-def main():
-	url='https://d3c33hcgiwev3.cloudfront.net/_7e5ccddd566bf61a9c29e4b0d5612cdf_1_Python_pip__________.pdf?Expires=1510444800&Signature=GI1npv9BKG2Bk0yfw1wUGYTQbhrN8angkK~4n--6dqNWdr-s1AeRSZpHgYybB0YFMftxbqIBUY1iVxVotG-TtGqCOYBtH2v1jhmh7tz9Ukm2UH1wQALmjoHncpXoyoRduoKtW27zSw1s089OGc2mTscK1z~E5QqB0zXcT9MO860_&Key-Pair-Id=APKAJLTNE6QMUY6HBC5A'
-	response = requests.get(url)
-	print(response.text)
-	tools = Tools()
-	self.tools.writeByte('test.pdf',response.content)
-
-
-if __name__ == '__main__':
-	main()

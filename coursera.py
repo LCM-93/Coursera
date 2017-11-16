@@ -28,7 +28,6 @@ class Coursera:
 		response = self.urlUtil.post(url,param,self.session,cookies=cookies,header=header)
 		response.encoding='utf-8'
 		# 页面写入文件 方便分析页面
-		# self.tools.writeFile('index.html',response.text)
 		return response.text
 		
 	# 获取课程标题
@@ -38,29 +37,16 @@ class Coursera:
 		print('发现课程：《'+title+'》\n')
 		return title
 
-	def getWeekUrls(self,soup):
-		weeks = soup.select('div[class="week-number body-2-text flex-1"] span')
-		pattern = re.compile(r'(\d)',re.S)
-		weekUrls = []
-		for week in weeks:
-			week = self.tools.removeTag(str(week))
-			week = re.sub('\D','',week)
-			weekUrls.append(self.courseUrl+'/home/week/'+str(week))
-
-		return weekUrls
 
 	def start(self):
-		self.courseUrl = input('请输入课程主页地址（例https://www.coursera.org/learn/hipython）：\n')
-		print('\n')
+		# self.courseUrl = input('请输入课程主页地址（例https://www.coursera.org/learn/hipython）：\n')
+		# print('\n')
 		content = self.login()
 		soup = BeautifulSoup(content,'lxml')
-		self.getTitle(soup)
-		weekUrls = self.getWeekUrls(soup)
-		weekcourse = WeekCourse(weekUrls,self.session)
+		title = self.getTitle(soup)
+		weekcourse = WeekCourse(title ,self.courseUrl,self.session)
 		weekcourse.start()
-		# for url in weekUrls:
-		# 	weekcourse = WeekCourse(url,self.session)
-		# 	weekcourse.start()
+		
 	
 def main(argv):
 	email = ''
@@ -92,5 +78,3 @@ def main(argv):
 if __name__ == '__main__':
     main(sys.argv[1:])
 
-# coursera = Coursera()
-# coursera.start()
