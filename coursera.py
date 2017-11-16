@@ -33,11 +33,11 @@ class Coursera:
 		
 	# 获取课程标题
 	def getTitle(self,soup):
-		title = soup.select('h1[class="course-name color-primary-text display-3-text"]')[0]
+		title = soup.select('h1[class="course-name color-primary-text display-3-text"]')
 		if not title:
 			print('获取课程标题 失败')
 			return None
-		title = self.tools.removeTag(str(title))
+		title = self.tools.removeTag(str(title[0]))
 		print('发现课程：《'+title+'》\n')
 		return title
 
