@@ -1,6 +1,10 @@
 # Coursera
 使用Python3写的Coursera课程爬虫
 
+[master](https://github.com/lichenming0516/Coursera/tree/master)分支是使用Selenium来加载js页面，再通过正则匹配等解析数据，效率较低。
+
+[Coursera2](https://github.com/lichenming0516/Coursera/tree/Coursera2)分支是通过分析网络请求，直接通过接口请求页面json数据进行解析，效率较高。
+
 
 ### 使用
 
