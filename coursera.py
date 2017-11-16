@@ -20,30 +20,35 @@ class Coursera:
 		self.courseUrl = 'https://www.coursera.org/learn/hipython'
 		# self.courseUrl = 'https://www.coursera.org/learn/da-xue-hua-xue'
 
+	# 登录你的Coursera账号
 	def login(self):
 		url = 'https://www.coursera.org/api/login/v3Ssr?csrf3-token=1510823580.eRKpKzepl351P5ij&src=undefined'
 		param = {'email':self.user,'password':self.password}
+		# 通过header头中的Referer参数  返回登录成功后的页面
 		header = {'Origin':'https://www.coursera.org','Referer':self.courseUrl+'/home/welcome'}
 		cookies = {'CSRF3-Token':'1510823580.eRKpKzepl351P5ij'}	
 		response = self.urlUtil.post(url,param,self.session,cookies=cookies,header=header)
 		response.encoding='utf-8'
-		# 页面写入文件 方便分析页面
 		return response.text
 		
 	# 获取课程标题
 	def getTitle(self,soup):
 		title = soup.select('h1[class="course-name color-primary-text display-3-text"]')[0]
+		if not title:
+			print('获取课程标题 失败')
+			return None
 		title = self.tools.removeTag(str(title))
 		print('发现课程：《'+title+'》\n')
 		return title
 
 
 	def start(self):
-		# self.courseUrl = input('请输入课程主页地址（例https://www.coursera.org/learn/hipython）：\n')
-		# print('\n')
+		self.courseUrl = input('\n请输入课程主页地址（例https://www.coursera.org/learn/hipython）：\n')
 		content = self.login()
 		soup = BeautifulSoup(content,'lxml')
 		title = self.getTitle(soup)
+		if not title:
+			title = input('请输入课程名称：')
 		weekcourse = WeekCourse(title ,self.courseUrl,self.session)
 		weekcourse.start()
 		

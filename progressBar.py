@@ -33,6 +33,7 @@ class ProgressBar:
         print(self.__get_info(), end=end_str)
 
 
+# 测试
 def main():
     url = 'http://www.futurecrew.com/skaven/song_files/mp3/razorback.mp3'
     with closing(requests.get(url, stream=True)) as response:

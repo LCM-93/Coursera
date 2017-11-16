@@ -58,7 +58,7 @@ class UrlUtil:
 				# print(str(e))
 				if num_retries > 0: 
 					time.sleep(5) 
-					print('获取网页出错，5S后将获取倒数第：'+ str(num_retries) +'次')
+					print('获取数据出错，5S后将获取倒数第：'+ str(num_retries) +'次')
 					return self.post(url, data, session, cookies, timeouts, header, proxy, num_retries-1)  
 				else:
 					print(u'开始使用代理')
@@ -106,7 +106,7 @@ class UrlUtil:
 				# print(str(e))
 				if num_retries > 0: 
 					time.sleep(5) 
-					print('获取网页出错，5S后将获取倒数第：'+ str(num_retries) +'次')
+					print('获取数据出错，5S后将获取倒数第：'+ str(num_retries) +'次')
 					return self.get(url,  session, cookies, timeouts, header, proxy, num_retries-1)  
 				else:
 					print(u'开始使用代理')
