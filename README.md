@@ -25,4 +25,4 @@
 	例：[https://www.coursera.org/learn/hipython](https://www.coursera.org/learn/hipython)
 	
 
-![截图](https://raw.githubusercontent.com/lichenming0516/Coursera/master/master-jietu.png)
+![截图](https://raw.githubusercontent.com/lichenming0516/Coursera/master/jietu.png)
