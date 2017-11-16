@@ -96,16 +96,23 @@ class Tools:
 	def downLoadFile(self,url,session,fileDir,fileName):
 		self.createDir(fileDir)
 		header = {'User-Agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'}
-		with closing(session.get(url,headers = header, stream=True)) as response:
-			chunk_size = 1024 # 单次请求最大值
-			content_size = int(response.headers['content-length']) # 内容体总大小
-			progress = ProgressBar(fileName, total=content_size,
-								unit="KB", chunk_size=chunk_size, run_status="正在下载", fin_status="下载完成")
-			with open(fileDir+'/'+fileName, "wb") as file:
-				for data in response.iter_content(chunk_size=chunk_size):
-					file.write(data)
-					progress.refresh(count=len(data))
+		try:
+			with closing(session.get(url,headers = header, stream=True)) as response:
+				chunk_size = 1024 # 单次请求最大值
+				content_size = int(response.headers['content-length']) # 内容体总大小
+				# progress = ProgressBar(fileName, total=content_size,
+				# 					unit="KB", chunk_size=chunk_size, run_status="正在下载", fin_status="下载完成")
+				print('下载视频：'+fileName+'   进程：'+ str(os.getpid()))
+				with open(fileDir+'/'+fileName, "wb") as file:
+					for data in response.iter_content(chunk_size=chunk_size):
+						file.write(data)
+						# progress.refresh(count=len(data))
 
+				return (True,fileName+' 下载成功',url)
+		except Exception as e:
+			print(e)
+			exit()
+			return(False,fileName+' 下载失败',url)
 
 def main():
 	tools= Tools()

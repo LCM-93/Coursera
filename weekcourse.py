@@ -8,6 +8,7 @@ import requests
 from urlutil import UrlUtil
 import json
 from pprint import pprint
+import multiprocessing
 
 class WeekCourse:
 
@@ -24,6 +25,9 @@ class WeekCourse:
 		self.assetsInclude = 'fields=audioSourceUrls%2C+videoSourceUrls%2C+videoThumbnailUrls%2C+fileExtension%2C+tags'
 		# 判断 文本 课程页是否包含额外文件的 正则匹配
 		self.assetPattern = re.compile(r'<asset.*?id="(.*?)".*?name="(.*?)".*?extension="(.*?)".*?/>',re.S)
+
+		self.pool = multiprocessing.Pool(processes = 6)
+		self.result = []
 
 	# 获取所有课程信息 Json 数据
 	def getCourseInfo(self):
@@ -75,9 +79,7 @@ class WeekCourse:
 			itemName = str(item['name'])
 			typeName = str(item['contentSummary']['typeName'])
 
-			if self.tools.isSpided(itemId):
-				print(itemName+' 已经爬过了')
-				continue
+			
 			# itemUrl = self.url+'/'+typeName+'/'+itemId+'/'+slug  # 每节课程的地址
 			# print(itemUrl) 
 			
@@ -86,6 +88,13 @@ class WeekCourse:
 				self.doForSupplementPage(itemId,self.moduleNameDict[moduleId]+'/'+self.lessonsNameDict[lessonId],itemName)
 			elif 'lecture' == typeName:
 				self.doForVideoPage(itemId,self.moduleNameDict[moduleId]+'/'+self.lessonsNameDict[lessonId],itemName)
+
+		self.pool.close()
+		self.pool.join()
+		for res in self.result:
+			print(res[1])
+			if res[0]:
+				self.tools.addSpidedRecord(res[2]) 
 
 
 
@@ -108,11 +117,17 @@ class WeekCourse:
 		else:
 			videoUrl = sources['360p']['mp4VideoUrl']
 
-		print('发现视频：%s'%itemName)
+		# print('发现视频：%s'%itemName)
 		itemName = self.tools.removeSpecialChar(itemName)
-		self.tools.downLoadFile(videoUrl,self.session,dirName,itemName+'.mp4')
-		print('保存视频 '+itemName+'.mp4 成功\n')
-		self.tools.addSpidedRecord(itemId) 
+
+		if self.tools.isSpided(videoUrl):
+			print(itemName+' 已经爬过了')
+			return
+
+		self.result.append(self.pool.apply_async(self.tools.downLoadFile,(videoUrl,self.session,dirName,itemName+'.mp4',)))
+		# self.tools.downLoadFile(videoUrl,self.session,dirName,itemName+'.mp4')
+		# print('保存视频 '+itemName+'.mp4 成功\n')
+		# self.tools.addSpidedRecord(itemId) 
 
 
 	# 解析文本的页面
@@ -133,8 +148,14 @@ class WeekCourse:
 		content = content.replace('</code>','</pre><br><br>')
 		content = '<html><head></head><body>' + content + '</body></html>'
 
-		print('发现网页：%s'%itemName)
+		# print('发现网页：%s'%itemName)
+
 		itemName = self.tools.removeSpecialChar(itemName)
+
+		if self.tools.isSpided(itemId):
+			print(itemName+' 已经爬过了')
+			return
+
 		self.tools.writeFile(itemName+'.html',content,dirName)
 		print('保存网页 '+itemName+'.html 成功\n')
 		self.tools.addSpidedRecord(itemId)
@@ -148,10 +169,16 @@ class WeekCourse:
 		jsonObject = json.loads(response.text)
 		assetsUrl = jsonObject['elements'][0]['url']['url']
 
-		print('发现文件：%s'%itemName)
+		# print('发现文件：%s'%itemName)
 		itemName = self.tools.removeSpecialChar(itemName)
-		self.tools.downLoadFile(assetsUrl,self.session,dirName,itemName+'.'+assetsType)
-		print('保存文件 '+itemName+'.'+assetsType+' 成功\n')
+
+		if self.tools.isSpided(assetsUrl):
+			print(itemName+' 已经爬过了')
+			return
+
+		self.result.append(self.pool.apply_async(self.tools.downLoadFile,(assetsUrl,self.session,dirName,itemName+'.'+assetsType,)))
+		# self.tools.downLoadFile(assetsUrl,self.session,dirName,itemName+'.'+assetsType)
+		# print('保存文件 '+itemName+'.'+assetsType+' 成功\n')
 
 
 

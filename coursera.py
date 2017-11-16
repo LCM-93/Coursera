@@ -43,7 +43,7 @@ class Coursera:
 
 
 	def start(self):
-		self.courseUrl = input('\n请输入课程主页地址（例https://www.coursera.org/learn/hipython）：\n')
+		# self.courseUrl = input('\n请输入课程主页地址（例https://www.coursera.org/learn/hipython）：\n')
 		content = self.login()
 		soup = BeautifulSoup(content,'lxml')
 		title = self.getTitle(soup)
