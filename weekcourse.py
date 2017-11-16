@@ -56,9 +56,11 @@ class WeekCourse:
 	def doForLessons(self):
 		lessons = self.courseInfo['onDemandCourseMaterialLessons.v1']
 		self.lessonsNameDict= {} #创建 lessons 目录名称字典 方便后面保存文件时保存到相应目录
+		i = 1;
 		for lesson in lessons:
-			dirName = str(lesson['name'])
+			dirName = str(i)+'.'+str(lesson['name'])
 			moduleId = str(lesson['moduleId'])
+			i += 1
 			self.lessonsNameDict[lesson['id']] = dirName
 			self.tools.createDir(self.moduleNameDict[moduleId]+'/'+dirName) # 创建目录
 
@@ -66,14 +68,16 @@ class WeekCourse:
 	# 处理每一小节的课程
 	def doForItems(self):
 		items = self.courseInfo['onDemandCourseMaterialItems.v2']
-
+		i = 1;
 		for item in items:
 			lessonId = str(item['lessonId'])
 			moduleId = str(item['moduleId'])
 			itemId = str(item['id']) 
 			slug = str(item['slug'])
-			itemName = str(item['name'])
+			itemName = str(i)+'.'+str(item['name'])
 			typeName = str(item['contentSummary']['typeName'])
+
+			i +=1
 
 			if self.tools.isSpided(itemId):
 				print(itemName+' 已经爬过了')
@@ -96,6 +100,7 @@ class WeekCourse:
 		response.encoding = 'UTF-8'
 		jsonObject = json.loads(response.text)
 		sources = jsonObject['linked']['onDemandVideos.v1'][0]['sources']['byResolution']
+		subtitles = jsonObject['linked']['onDemandVideos.v1'][0]['subtitles']
 
 		videoUrl = ''
 		if not sources:
@@ -112,6 +117,19 @@ class WeekCourse:
 		itemName = self.tools.removeSpecialChar(itemName)
 		self.tools.downLoadFile(videoUrl,self.session,dirName,itemName+'.mp4')
 		print('保存视频 '+itemName+'.mp4 成功\n')
+
+		subtitleUrl = ''
+		if 'zh-CN' in subtitles.keys():
+			subtitleUrl = 'https://www.coursera.org'+subtitles['zh-CN']
+		elif 'zh-TW' in subtitles.keys():
+			subtitleUrl = 'https://www.coursera.org'+subtitles['zh-TW']
+
+		if subtitleUrl:
+			print('下载字幕 %s.srt\n'%itemName)
+			response = self.urlutil.get(subtitleUrl,self.session)
+			response.encoding = 'UTF-8'
+			self.tools.writeFile(itemName+'.srt',response.text,dirName)
+
 		self.tools.addSpidedRecord(itemId) 
 
 
