@@ -20,6 +20,9 @@
 3. 输入你注册的课程主页地址
 	
 	例：[https://www.coursera.org/learn/hipython](https://www.coursera.org/learn/hipython)
-	
+
+
+
+![截图](https://raw.githubusercontent.com/lichenming0516/Coursera/Coursera2/%E6%88%AA%E5%9B%BE.png)
 
 	
