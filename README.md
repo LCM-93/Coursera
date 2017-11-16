@@ -6,6 +6,9 @@
 [Coursera2](https://github.com/lichenming0516/Coursera/tree/Coursera2)分支是通过分析网络请求，直接通过接口请求页面json数据进行解析，效率较高。
 
 
+[multi-coursera](https://github.com/lichenming0516/Coursera/tree/multi-coursera) 分支是在Coursera2的基础上增加多进程下载，充分利用cpu性能
+
+
 ### 使用
 
 1. 命令行进入项目目录
@@ -22,4 +25,4 @@
 	例：[https://www.coursera.org/learn/hipython](https://www.coursera.org/learn/hipython)
 	
 
-![截图](https://raw.githubusercontent.com/lichenming0516/Coursera/Coursera2/%E6%88%AA%E5%9B%BE.png)
+![截图](https://raw.githubusercontent.com/lichenming0516/Coursera/master/master-jietu.png)
